@@ -59,7 +59,7 @@ PC | Tomy
 ## Special Credits and Thanks
 - TMOP for his help with testing and gathering carts to test.
 - [Original TMS99095 FPGA code by Paul Ruiz](https://gitlab.com/pnru/cortex/-/blob/master/tms99095.v).
-- [F18A VDP by Matthew Hagerty](https://dnotq.io/f18a/f18a.html).
+- [F18A VDP by Matthew Hagerty](https://github.com/dnotq/f18a).
 
 ![Tutor Keyboard Layout](assets/TomyTutor.png)
 ![Pyuta Keyboard Layout](assets/TomyPyuta.png)

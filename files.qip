@@ -1,0 +1,31 @@
+set_global_assignment -name VERILOG_FILE rtl/spram.v
+set_global_assignment -name VHDL_FILE rtl/dpram16_8.vhd
+
+set_global_assignment -name VHDL_FILE rtl/sn76489/sn76489_clock_div.vhd
+set_global_assignment -name VHDL_FILE rtl/sn76489/sn76489_latch_ctrl.vhd
+set_global_assignment -name VHDL_FILE rtl/sn76489/sn76489_noise.vhd
+set_global_assignment -name VHDL_FILE rtl/sn76489/sn76489_tone.vhd
+set_global_assignment -name VHDL_FILE rtl/sn76489/sn76489_attenuator.vhd
+set_global_assignment -name VHDL_FILE rtl/sn76489/sn76489_top.vhd
+
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_color.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_core.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_counters.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_cpu.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_div32x16.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_gpu.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_single_port_ram.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_sprites.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_tiles.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_version.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_vga_cont_640_60.vhd
+set_global_assignment -name VHDL_FILE rtl/f18a/f18a_vram.vhd
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/tape_status_overlay.sv
+set_global_assignment -name VERILOG_FILE rtl/ls74.v
+set_global_assignment -name VERILOG_FILE rtl/UTIL9995.v
+set_global_assignment -name VERILOG_FILE rtl/tms99095.v
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/tutor.sv
+set_global_assignment -name SDC_FILE TomyTutor.sdc
+set_global_assignment -name SYSTEMVERILOG_FILE TomyTutor.sv

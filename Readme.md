@@ -2,11 +2,12 @@
     <img src="assets/Tutor.gif">
 </p>
 
-## Tomy Tutor for MiSTer
+# [Tomy Tutor](https://wikipedia.org/wiki/Tomy_Tutor) for [MiSTer](https://mister-devel.github.io/MkDocs_MiSTer/)
+This is an FPGA implementation of the Tomy Tutor, Pyuta, and Pyuta Jr. for the MiSTer FPGA platform.
 
 ## Features
-- Support for [Tutor, Pyuta and Pyuta Jr](https://wikipedia.org/wiki/Tomy_Tutor)
-- Tape In support via ADC
+- Support for Tutor, Pyuta and Pyuta Jr
+- Tape-In support via [ADC](https://mister-devel.github.io/MkDocs_MiSTer/basics/addons/#adc-analog-audio-input-addon-board)
 - Tape support via tape images.  (Read and Write)
 - Matthew Hagerty's F18A - With selectable 4/32 sprite limit.
 
@@ -57,8 +58,8 @@ PC | Tomy
 
 ## Special Credits and Thanks
 - TMOP for his help with testing and gathering carts to test.
-- Original TMS99095 FPGA code by Paul Ruiz.
-- F18A VDP by Matthew Hagerty.
+- [Original TMS99095 FPGA code by Paul Ruiz](https://gitlab.com/pnru/cortex/-/blob/master/tms99095.v).
+- [F18A VDP by Matthew Hagerty](https://github.com/dnotq/f18a).
 
 ![Tutor Keyboard Layout](assets/TomyTutor.png)
 ![Pyuta Keyboard Layout](assets/TomyPyuta.png)

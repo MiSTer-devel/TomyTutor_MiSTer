@@ -196,34 +196,47 @@ assign LED_USER = 0;
 assign BUTTONS = osd_btn;
 
 ////////////////////////////////////////////////////////////////////
-// Status Bit Map:
-//             Upper                             Lower              
-// 0         1         2         3          4         5         6   
-// 01234567890123456789012345678901 23456789012345678901234567890123
-// 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXX.XXXX
+// Status Bit Map:                                                                                     1         1         1
+// 0         1         2         3         4         5         6         7         8         9         0         1         2
+// 01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567
+// XXXXXXXXXXXXXXXXXX
+
+// The Dev Menu is hidden by default because most, if not all users will never need to use it.
+// The Tutor/Pyuta had an expansion port that allowed for devices with ram such as Tanam1972's Rom/Ram cartridge.
+// There are game roms/cart images that utilize certain banks of RAM but currently, the code can detect those and enable
+// them accordingly.  This menu is meant for developers who want to write or port software that may need to use these banks.
+// To enable/disable the menu and ram banks, press ALT-F11.
+
 `include "build_id.v" 
 localparam CONF_STR = {
 	"TomyTutor;;",
 	"FC2,BIN,Load Cartridge;",
 
-	"P2,Tape;",
-	"P2S0,CAS,Mount Tape Image;",
-	"D0P2O2,Tape Read Only,No,Yes;",
-	"P2O[4:3],Tape Status,Never,Always,When Mounted, With Activity;",
-	"P2O[7],Tape Audio,Muted,UnMuted;",
-	"D1P2T[10},Stop   [F5];",
-	"D1P2T[11],Rewind [F6];",
+	"P1,Tape;",
+	"P1S0,CAS,Mount Tape Image;",
+	"D0P1O[2],Tape Read Only,No,Yes;",
+	"P1O[4:3],Tape Status,Never,Always,When Mounted, With Activity;",
+	"P1O[5],Tape Audio,Muted,UnMuted;",
+	"D1P1T[6},Stop   [F5];",
+	"D1P1T[7],Rewind [F6];",
+
+	"h2P2,Dev Menu;",
+	"h2P2O[13],4000-5FFF Ram,Off,On;",
+	"h2P2O[14],6000-7FFF Ram,Off,On;",
+	"h2P2O[15],8000-9FFF Ram,Off,On;",
+	"h2P2O[16],A000-BFFF Ram,Off,On;",
+	"h2P2O[17],C000-DFFF Ram,Off,On;",
 	"-;",
 
 	"P3,Video Settings;",
-	"P3O[21],MAX Num of Sprites,32,4;",
-	"P3O[6:5],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
-	"P3O[1],Aspect Ratio,Original,Full Screen;",
+	"P3O[8],MAX Num of Sprites,32,4;",
+	"P3O[10:9],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
+	"P3O[11],Aspect Ratio,Original,Full Screen;",
+	"P3O[12],Vertical Crop,Off,On;",
 	"-;",
 	"FC1,ROM,Select System Rom;",
 	"-;",
-   "R[8],Eject Cartridge;",
+   "R[1],Eject Cartridge;",
 	"-;",
 	"R[0],Reset;",
 	"J,Fire 1,Fire 2,1,2,Enter/RT;",
@@ -233,7 +246,7 @@ localparam CONF_STR = {
 wire  [1:0] buttons;
 wire [127:0] status;
 wire [127:0] status_o;		//So we can update OCD Settings on the fly
-wire [15:0] status_mask = {13'd0, ~tape_mounted, (img_readonly_r || ~tape_mounted)};
+wire [15:0] status_mask = {12'd0, dev_menu_en, ~tape_mounted, (img_readonly_r || ~tape_mounted)};
 wire        status_update;
 
 wire [31:0] joy0, joy1;
@@ -318,6 +331,28 @@ always @(posedge clk_sys) begin
 	end
 end
 
+
+//Enable/Disable Hidden Developer Menu via ALT-F11 hotkey
+wire       pressed = ps2_key[9];
+reg        btn_alt = 0;
+reg        dev_menu_en;
+reg  [4:0] ram_banks;
+
+assign ram_banks = dev_menu_en ? status[17:13] : 5'd0; //Capture what banks of RAM are enabled, but only if Dev Menu is enabled
+
+always @(posedge clk_sys) begin
+	reg old_state;
+	old_state <= ps2_key[10];
+	
+	if(old_state != ps2_key[10]) begin
+		casex(ps2_key[7:0])
+			'h11: btn_alt   <= pressed; // ALT
+			'h78: if(btn_alt) dev_menu_en <= (~dev_menu_en & pressed) | (dev_menu_en & ~pressed);  // F11
+		endcase
+	end
+end
+
+
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
@@ -388,25 +423,30 @@ end
 
 ///////////////////////// Erase Cart Ram /////////////////////////
 reg erasing;
-wire [15:0] erase_addr;
+wire [16:0] erase_addr;
 wire        erase_wr;
 
 always @(posedge clk_sys) begin
 	reg old_clear = 0;
-	old_clear <= status[8];
-	if (~old_clear & status[8]) begin
+	old_clear <= status[1];
+	if (~old_clear & status[1]) begin
 		erasing <= 1;
-		erase_addr <= 16'h0000;
+		erase_addr <= 17'h0C000;
 		erase_wr <= 1;
 	end
 	if(erasing == 1) begin
 		if(~erase_wr) begin
-			if(erase_addr >= 16'h0000 && erase_addr <= 16'h8000) begin
+         if(erase_addr >= 17'h0C000 && erase_addr <= 17'h0DFFF) begin
+				erase_wr <= 1;
+				erase_addr <= erase_addr + 8'd1;
+			end
+			else if(erase_addr == 17'hE000) erase_addr <= 17'h10000;
+			if(erase_addr >= 17'h10000 && erase_addr <= 17'h18000) begin
 				erase_wr <= 1;
 				erase_addr <= erase_addr + 8'd1;
 			end
 			else begin
-				erase_addr <= 16'h0000;
+				erase_addr <= 17'h00000;
 				erasing <= 0;
 				erase_wr <= 0;
 			end
@@ -421,7 +461,7 @@ end
 
 assign CLK_VIDEO = clk_100m;
 
-wire ar = status[1];
+wire ar = status[11];
 wire vga_de;
 video_freak video_freak
 (
@@ -429,9 +469,9 @@ video_freak video_freak
 	.VGA_DE_IN(vga_de),
 	.ARX((!ar) ? 12'd400 : ar ),
 	.ARY((!ar) ? 12'd300 : 12'd0),
-	.CROP_SIZE(0),
+	.CROP_SIZE(status[12] ? 10'd384 : 0),
 	.CROP_OFF(0),
-	.SCALE(status[6:5])
+	.SCALE(status[10:9])
 );
 
 wire [3:0] R,G,B;
@@ -503,6 +543,9 @@ assign download_addr[16:1] = ioctl_index == 2 ? ioctl_addr[16:1] + 16'h8000 : io
 
 wire [16:0] cart_size;
 wire [16:0] system_rom_hash;
+// If the rom being loaded is 32K in size and has bytes x2000-3FFF zero'd out, it's a 24K rom with 16K Ram. 8K @ x6000-7FFF and 8K @ C000-DFFF
+wire  [7:0] ram24kcheck;
+reg         ram_cart_en;  // Enable the 16K of RAM if criteria is met.
 
 //Tutor = x2E8E
 //Pyuta = x23D7
@@ -511,13 +554,18 @@ wire [16:0] system_rom_hash;
 always @(posedge clk_sys) begin
 	reg [16:0] last_ioaddr;
 	if(ioctl_download && (ioctl_index == 0 || ioctl_index == 1) && ioctl_addr[16:0] == 16'h0) system_rom_hash = 0;
+	if(ioctl_download && ioctl_index == 2 && ioctl_addr[16:0] == 16'h0) ram24kcheck = 0;
 	if(ioctl_download && ioctl_index == 2) cart_size = ioctl_addr[16:0];
 	last_ioaddr <= ioctl_addr[16:0];
 	if(ioctl_download == 1 && (ioctl_index == 0 || ioctl_index == 1)  && last_ioaddr != ioctl_addr ) begin
 		system_rom_hash = system_rom_hash + ioctl_dout[0];
 	end
+	if(ioctl_download == 1 && ioctl_index == 2 && last_ioaddr != ioctl_addr && ioctl_addr >= 'h2000 && ioctl_addr <= 'h3FFF ) begin
+		ram24kcheck = ram24kcheck + ioctl_dout[0];
+	end
 end
 
+assign ram_cart_en = (cart_size > 'h4000 && ~ram24kcheck);
 
 
 
@@ -580,6 +628,8 @@ tutor console
 
 	.system_type(system_rom_hash == 16'h1127 ? 2'd2 : system_rom_hash == 16'h23D7 ? 2'd1 : system_rom_hash == 16'h2E8E ? 2'd0 : 2'd3),
 	.cart_size(cart_size),
+	
+	.ram({ram_banks[4] | ram_cart_en, ram_banks[3:2],ram_banks[1] | ram_cart_en, ram_banks[0]}),
 
 	////////////// Control Interface //////////////
 	.ps2_key(ps2_key),
@@ -599,9 +649,9 @@ tutor console
 
 	///////////// Tape Interface  /////////////////
 	.tape_overlay_en(status[4:3]),
-	.tape_ctrl({status[11],status[10]}),  // Currently 2 bits: 1 = Rewind, 0 = Stop
+	.tape_ctrl({status[7],status[6]}),  // Currently 2 bits: 1 = Rewind, 0 = Stop
 	.tape_in(tape_in),
-	.tape_audio_en(status[7]),
+	.tape_audio_en(status[5]),
 	
 	.tape_mounted(tape_mounted),
 	.tape_readonly(tape_readonly),
@@ -622,7 +672,7 @@ tutor console
 	.hsync_n_o(hsync),
 	.vsync_n_o(vsync),
 	.hblank_o(hblank),
-	.sprite_max(status[21])
+	.sprite_max(status[8])
 	
 );
 

@@ -29,7 +29,7 @@ module TMS99095 (
   input  wire   [3:0] IC,
   output wire  [15:0] ADDR_OUT,
   output wire  [15:0] DATA_OUT,
-  output reg         CLKOUT,
+  output reg          CLKOUT,
   output wire         RD,
   output wire         WR,
   output wire         nMEM,
@@ -304,6 +304,7 @@ module TMS99095 (
   always @(posedge CLKOUT)
   begin
     if (!stall) begin
+//      pc <= {pc_d[15:1],1'b0}; wp <= wp_d; st <= st_d;
       pc <= pc_d; wp <= wp_d; st <= st_d;
       ea <= ea_d; t1 <= t1_d; t2 <= t2_d; t3 <= t3_d;
       bit16 <= bit16_d;
@@ -313,16 +314,17 @@ module TMS99095 (
   // Register load operations
   always @*
   begin
+//    pc_d = {pc[15:1],1'b0}; wp_d = wp; ea_d = ea; t2_d = t2;
     pc_d = pc; wp_d = wp; ea_d = ea; t2_d = t2;
     case (wr_au)
-      pc_au: pc_d = (stst!=stjmp || sigjmp) ? a_out : pc;  // implement conditional jmp
+      pc_au: pc_d = (stst!=stjmp || sigjmp) ? {a_out[15:1],1'b0} : {pc[15:1],1'b0};  // implement conditional jmp
       wp_au: wp_d = a_out;
       ea_au: ea_d = a_out;
       t2_au: t2_d = a_out;
 		default: /* nothing */ ;
     endcase
     case (wr_di)
-      pc_di: pc_d = db_in;
+      pc_di: pc_d = {db_in[15:1],1'b0};
       wp_di: wp_d = db_in;
       ea_di: ea_d = db_in;
       t2_di: t2_d = db_in;

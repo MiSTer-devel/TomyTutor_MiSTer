@@ -21,6 +21,8 @@ module tutor
 
 	input   [1:0] system_type,
 	input  [16:0] cart_size,
+	
+	input   [4:0] ram,
 
 	////////////// Control Interface //////////////
 	input  [10:0] ps2_key,
@@ -147,7 +149,6 @@ UTIL9995 utl(
 	.utl_sel(utl_sel),
  
 	.cruclk(~cpu_cruclk),
-//	.cruclk(cpu_cruclk),
 	.cruout(cpu_cruout),
    .cruin(utl_cruin),
  
@@ -161,13 +162,10 @@ UTIL9995 utl(
 
 TMS99095 cpu
 (
-//	.CLK(clk_2m7),
 	.CLK(clk),
 	.CLKOUT(clkout),
-//	.CLKOUT(clk_2m7),
 	.RESET(cpu_reset),
 	.ADDR_OUT(cpu_addr),
-	.ADDR_OUT2(),
 	.DATA_IN(data_to_cpu),
 	.DATA_OUT(data_from_cpu),
 	.RD(cpu_rd),
@@ -209,18 +207,6 @@ wire        cpu_int_req;
 wire        cpu_int_ack;
 
 
-// Scratchpad
-//wire [15:0] wp_ram;
-//spram #(11, 16) wpram
-//(
-//	.clock(clk),
-//	.address(cpu_addr[11:1]),
-//	.wren((cpu_wr == 1'b1 && cpu_addr[15:12] == 4'b1111)),
-//	.data(data_from_cpu),
-//	.q(wp_ram)
-//);
-
-
 // Data Bus
 wire [15:0] sram_addr_bus; 
 wire [15:0] sram_16bit_read_bus;
@@ -236,13 +222,12 @@ assign data_to_cpu = vdp_rd ? {vdp_data_out,8'h00} :
 							utl_sel ? utl_o :
 							(system_type == 2'd2 && cpu_addr[15:11] == 5'h1D) ? {kbdjr_scan,8'h00} :
 							cpu_addr[15:8] == 8'hE1 ? 16'h0000 : 
-//							cpu_addr[15:12] == 4'b1111 ? wp_ram : 
 							cpu_addr == 'hE110 ? 16'h0000 : 						//Return 'h4200 if we have alternate boot rom in cart, 0 if not.
 							sram_16bit_read_bus[15:0];
 
 assign sram_addr_bus =
-	((cart_en || system_type != 2'd0) && cart_size > 16'h4000 && (cpu_addr >= 16'h4000 && cpu_addr <= 16'hDFFF)) ? cpu_addr[15:1] + 16'h6000 : 
-	((cart_en || system_type != 2'd0) && cart_size <= 16'h4000 && (cpu_addr >= 16'h8000 && cpu_addr <= 16'hDFFF)) ? cpu_addr[15:1] + 16'h4000 : 
+	((cart_en || system_type != 2'd0) && cart_size > 16'h4000 && (cpu_addr >= 16'h4000 && cpu_addr <= 16'hBFFF)) ? cpu_addr[15:1] + 16'h6000 : 
+	((cart_en || system_type != 2'd0) && cart_size <= 16'h4000 && (cpu_addr >= 16'h8000 && cpu_addr <= 16'hBFFF)) ? cpu_addr[15:1] + 16'h4000 : 
 	{1'b0,cpu_addr[15:1]};
 
 
@@ -253,7 +238,13 @@ begin
 end
 
 assign audio_o = {1'b0 ,aout_o[7],tape_audio_en ? tape_reading ? tape_in | tape_file_in : tape_writing ? tape_out : aout_o[6] : aout_o[6], aout_o[5:0], 2'b00};
-assign cpu_ram_we_n_o = (cpu_wr == 1'b1 && cpu_addr[15:12] == 4'b1111) ? 1'b0 : 1'b1;
+assign cpu_ram_we_n_o = (cpu_wr == 1'b1 && ((cpu_addr[15:12] == 4'b1111) ||
+                                   (ram[4] && cpu_addr[15:13] == 3'b110) ||        //Ram at C000-DFFF
+                                   (ram[3] && cpu_addr[15:13] == 3'b101) ||        //Ram at A000-BFFF
+                                   (ram[2] && cpu_addr[15:13] == 3'b100) ||        //Ram at 8000-9FFF
+                                   (ram[1] && cpu_addr[15:13] == 3'b011) ||        //Ram at 6000-7FFF
+                                   (ram[0] && cpu_addr[15:13] == 3'b010)           //Ram at 4000-5FFF
+                                   )) ? 1'b0 : 1'b1;
 
 assign cpu_ram_d_o = data_from_cpu;
 
@@ -267,6 +258,7 @@ always @(posedge clk) begin
 	wr_sampler = {wr_sampler[2:0],cpu_wr};
 	rd_sampler = {rd_sampler[2:0],(cpu_rd && cpu_bst == 4'b0001)};
 end
+
 
 // Cartridge Handling
 always @(posedge clk) begin
@@ -921,3 +913,4 @@ always @(posedge clock) begin
 end
 
 endmodule
+

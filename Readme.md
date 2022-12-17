@@ -7,6 +7,7 @@ This is an FPGA implementation of the Tomy Tutor, Pyuta, and Pyuta Jr. for the M
 
 ## Features
 - Support for Tutor, Pyuta and Pyuta Jr
+- Support for Cartridges with RAM Expansion (ex. DoorDoor, TI-Scramble)
 - Tape-In support via [ADC](https://mister-devel.github.io/MkDocs_MiSTer/basics/addons/#adc-analog-audio-input-addon-board)
 - Tape support via tape images.  (Read and Write)
 - Matthew Hagerty's F18A - With selectable 4/32 sprite limit.

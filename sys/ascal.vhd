@@ -222,6 +222,7 @@ ENTITY ascal IS
 		vmax    : IN natural RANGE 0 TO 4095; -- 0 <= vmin < vmax < vdisp
 		vrr     : IN std_logic := '0';
 		vrrmax  : IN natural RANGE 0 TO 4095 := 0;
+		swblack : IN std_logic := '0';        -- will output 3 black frame on every resolution switch
 
 		-- Scaler format. 00=16bpp 565, 01=24bpp 10=32bpp
 		format  : IN unsigned(1 DOWNTO 0) :="01";
@@ -425,9 +426,12 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_hmin,o_hmax,o_hdisp,o_v_hmin_adj : uint12;
 	SIGNAL o_hsize,o_vsize : uint12;
 	SIGNAL o_vtotal,o_vsstart,o_vsend : uint12;
-	SIGNAL o_vrr : std_logic;
-	SIGNAL o_vcpt_sync, o_vrrmax : uint12;
-	SIGNAL o_sync, o_sync_max : std_logic;
+	SIGNAL o_vrr,o_isync,o_isync2 : std_logic;
+	SIGNAL o_vrr_sync,o_vrr_sync2 : boolean;
+	SIGNAL o_vrr_min,o_vrr_min2 : boolean;
+	SIGNAL o_vrr_max,o_vrr_max2 : boolean;
+	SIGNAL o_vcpt_sync,o_vcpt_sync2, o_vrrmax : uint12;
+	SIGNAL o_sync, o_sync_max : boolean;
 	SIGNAL o_vmin,o_vmax,o_vdisp : uint12;
 	SIGNAL o_divcpt : natural RANGE 0 TO 36;
 	SIGNAL o_iendframe0,o_iendframe02,o_iendframe1,o_iendframe12 : std_logic;
@@ -461,7 +465,7 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_wadl,o_radl0,o_radl1,o_radl2,o_radl3 : natural RANGE 0 TO OHRES-1;
 	SIGNAL o_ldw,o_ldr0,o_ldr1,o_ldr2,o_ldr3 : type_pix;
 	SIGNAL o_wr : unsigned(3 DOWNTO 0);
-	SIGNAL o_hcpt,o_vcpt,o_vcpt_pre,o_vcpt_pre2,o_vcpt_pre3 : uint12;
+	SIGNAL o_hcpt,o_vcpt,o_vcpt_pre,o_vcpt_pre2,o_vcpt_pre3,o_vcpt2 : uint12;
 	SIGNAL o_ihsize,o_ihsizem,o_ivsize : uint12;
 	SIGNAL o_ihsize_temp, o_ihsize_temp2 : natural RANGE 0 TO 32767;
 
@@ -507,6 +511,7 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_divrun : std_logic;
 	SIGNAL o_hacpt,o_vacpt : unsigned(11 DOWNTO 0);
 	SIGNAL o_vacptl : unsigned(1 DOWNTO 0);
+	signal o_newres : integer range 0 to 3;
 
 	-----------------------------------------------------------------------------
 	FUNCTION shift_ishift(shift : unsigned(0 TO 119);
@@ -1849,13 +1854,15 @@ BEGIN
 			o_hsize  <=o_hmax - o_hmin + 1;
 			o_vsize  <=o_vmax - o_vmin + 1;
 
-			o_vrr    <= vrr;
+			o_vrr    <=vrr;
 			o_vrrmax <= vrrmax;
 
 			--------------------------------------------
 			-- Triple buffering.
 			-- For intelaced video, half frames are updated independently
 			-- Input : Toggle buffer at end of input frame
+			o_isync <= '0';
+			o_isync2 <= o_isync;
 			o_freeze <= freeze;
 			o_inter  <=i_inter; -- <ASYNC>
 			o_iendframe0<=i_endframe0; -- <ASYNC>
@@ -1863,12 +1870,14 @@ BEGIN
 			IF o_iendframe0='1' AND o_iendframe02='0' THEN
 				o_ibuf0<=buf_next(o_ibuf0,o_obuf0,o_freeze);
 				o_bufup0<='1';
+				o_isync <= '1';
 			END IF;
 			o_iendframe1<=i_endframe1; -- <ASYNC>
 			o_iendframe12<=o_iendframe1;
 			IF o_iendframe1='1' AND o_iendframe12='0' THEN
 				o_ibuf1<=buf_next(o_ibuf1,o_obuf1,o_freeze);
 				o_bufup1<='1';
+				o_isync <= '1';
 			END IF;
 
 			-- Output : Change framebuffer, and image properties, at VS falling edge
@@ -1883,6 +1892,14 @@ BEGIN
 				o_ivsize<=i_vrsize; -- <ASYNC>
 				o_hdown<=i_hdown; -- <ASYNC>
 				o_vdown<=i_vdown; -- <ASYNC>
+
+				IF (o_newres > 0) then
+					o_newres <= o_newres- 1;
+				END IF;
+			END IF;
+
+			IF (swblack = '1' and o_fb_ena = '0' and (o_ihsize /= i_hrsize or o_ivsize /= i_vrsize)) then
+				o_newres <= 3;
 			END IF;
 
 			-- Simultaneous change of input and output framebuffers
@@ -2211,6 +2228,9 @@ BEGIN
 					-- 8bpp indexed colour mode
 					hpix_v:=(r=>o_fb_pal_dr(23 DOWNTO 16),g=>o_fb_pal_dr(15 DOWNTO 8),
 									 b=>o_fb_pal_dr(7 DOWNTO 0));
+				END IF;
+				IF (o_newres > 0) then
+					hpix_v := (others => (others => '0'));
 				END IF;
 				o_hpix0<=hpix_v;
 				o_hpix1<=o_hpix0;
@@ -2645,16 +2665,15 @@ BEGIN
 				ELSE
 					o_hcpt<=0;
 
-					IF o_vcpt_sync < 4095 THEN
+					IF o_vcpt_sync /= 4095 THEN
 						o_vcpt_sync <= o_vcpt_sync+1;
 					END IF;
 
 					IF o_vcpt_pre3+1>=o_vtotal THEN
 						o_vcpt_pre3<=0;
-						o_sync<='0';
-					ELSIF o_sync='1' OR (o_sync_max='1' AND o_vcpt_pre3=o_vdisp) THEN
+					ELSIF o_vrr_sync2 THEN
 						o_vcpt_pre3<=o_vsstart;
-						o_sync<='0';
+						o_sync<=false;
 					ELSE
 						o_vcpt_pre3<=(o_vcpt_pre3+1) MOD 4096;
 					END IF;
@@ -2687,20 +2706,26 @@ BEGIN
 					o_pev(2)<='0';
 					o_end(2)<='0';
 				END IF;
-
 			END IF;
 
-			IF o_iendframe0='1' AND o_iendframe02='0' THEN
-				o_vcpt_sync <= 0;
-				o_sync_max <= '0';
-				IF o_vrr='1' THEN
-					IF o_vcpt_sync<=o_vrrmax THEN
-						o_sync_max <= '1';
-					ELSIF o_vcpt_sync<o_vtotal AND o_vcpt_pre3>=o_vdisp AND o_vcpt_pre3<o_vsstart THEN
-						o_sync<='1';
-					END IF;
-				END IF;
+			o_vcpt_sync2<=o_vcpt_sync;
+			o_vrr_min<=(o_vcpt_sync2<o_vtotal);
+			o_vrr_min2<=o_vrr_min;
+			o_vrr_max<=(o_vcpt_sync2<o_vrrmax);
+			o_vrr_max2<=o_vrr_max;
+
+			IF o_isync2='1' THEN
+				o_vcpt_sync<=0;
+				o_sync_max<=o_vrr_max2;
+				IF o_vrr_min2 THEN
+					o_sync<=true;
+				END iF;
 			END IF;
+
+			o_vcpt2<=o_vcpt_pre3;
+			o_vrr_sync<=(o_vrr='1' AND (o_sync OR o_sync_max) AND o_vcpt2>=o_vdisp AND o_vcpt2<o_vsstart);
+			o_vrr_sync2<=o_vrr_sync;
+
 	 END IF;
 	END PROCESS OSWEEP;
 

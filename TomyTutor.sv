@@ -49,13 +49,15 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+	output        VGA_DISABLE, // analog out is off
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
+	output        HDMI_BLACKOUT,
 
 `ifdef MISTER_FB
-	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
+	// Use framebuffer in DDRAM
 	// FB_FORMAT:
 	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
 	//    [3]   : 0=16bits 565 1=16bits 1555
@@ -182,7 +184,9 @@ assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DD
 //assign VGA_SL = 0;
 assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
+assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
+assign HDMI_BLACKOUT = 0;
 
 wire [10:0] audio;
 assign AUDIO_L = {audio,5'd0};
@@ -438,12 +442,12 @@ always @(posedge clk_sys) begin
 		if(~erase_wr) begin
          if(erase_addr >= 17'h0C000 && erase_addr <= 17'h0DFFF) begin
 				erase_wr <= 1;
-				erase_addr <= erase_addr + 8'd1;
+				erase_addr <= erase_addr + 1'b1;
 			end
 			else if(erase_addr == 17'hE000) erase_addr <= 17'h10000;
-			if(erase_addr >= 17'h10000 && erase_addr <= 17'h18000) begin
+			else if(erase_addr >= 17'h10000 && erase_addr <= 17'h18000) begin
 				erase_wr <= 1;
-				erase_addr <= erase_addr + 8'd1;
+				erase_addr <= erase_addr + 1'b1;
 			end
 			else begin
 				erase_addr <= 17'h00000;
@@ -565,7 +569,7 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign ram_cart_en = (cart_size > 'h4000 && ~ram24kcheck);
+assign ram_cart_en = (cart_size > 'h4000 && ~ram24kcheck) || cart_size <= 'h4000;
 
 
 

@@ -290,13 +290,12 @@ assign tape_info = {3'd0,tape_readonly};
 reg  [7:0] ro,go,bo;
 always @(posedge clk) begin
 
-	reg [29:0] blocks;
+	reg [9:0] blocks;
 	
 	if (tape_max_blocks >999) tape_max_blocks <= 999;
 	if (tape_mounted) begin
-	   blocks = tape_size[29:0] / 30'd1024;
-		tape_max_blocks <= blocks[9:0];
-		if(tape_size[29:0] % 30'd1024) tape_max_blocks <= tape_max_blocks + 1'b1;  //If the tape size is not on 1k boundaries, round up
+		blocks = tape_size[19:10] + |tape_size[9:0];
+		tape_max_blocks <= blocks;
 	end
 end
 
